@@ -1,5 +1,6 @@
 const ALLOWED_ORIGINS = new Set([
   'https://penta1031.github.io',
+  'https://smlim87.github.io',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ]);

@@ -37,6 +37,8 @@ jobs:
         run: npm run build
         env:
           VITE_LIVE_API_URL: https://kbo-record-finder-api.vercel.app
+          VITE_SUPABASE_URL: https://iribvqmnkpbgudzvfnqi.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

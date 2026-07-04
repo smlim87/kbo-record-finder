@@ -26,6 +26,7 @@ import {
 import { fetchKboLiveGame, fetchKboSchedule, hasLiveApi } from './liveApi';
 import { calculateLiveStats } from './recordEngine';
 import { WEEKLY_RECORDS, WEEKLY_RECORD_SOURCE } from './weeklyRecords';
+import { fetchCalculatedRecords, hasSupabaseRecords } from './supabaseRecords';
 import { getTodayKey, getYearDays } from './dateUtils';
 import './styles.css';
 
@@ -801,7 +802,7 @@ function DetailSheet({ record, liveStats, onClose }) {
           {record.liveDelta > 0 && <p className="live-detail-delta">이번 경기에서 +{record.liveDelta}{record.liveStatLabel} 감지</p>}
         </div>
         <div className="detail-section">
-          <div className="section-title"><h3>{record.scope === '구장' ? '구장 현황' : '기록 현황'}</h3><span>문서 기준</span></div>
+          <div className="section-title"><h3>{record.scope === '구장' ? '구장 현황' : '기록 현황'}</h3><span>{record.sourceType === 'calculated' ? '자동 계산' : '문서 기준'}</span></div>
           <div className="stat-grid">
             {Object.entries(record.season).map(([label, value]) => <div key={label}><span>{label}</span><b>{value}</b></div>)}
           </div>
@@ -816,7 +817,7 @@ function DetailSheet({ record, liveStats, onClose }) {
           <p className="insight"><Sparkles size={16} /> {record.note}</p>
         </div>
         <RecordLiveStatus record={record} liveStats={liveStats} />
-        <p className="demo-notice"><Info size={15} /> 기록 기준: {WEEKLY_RECORD_SOURCE}</p>
+        <p className="demo-notice"><Info size={15} /> 기록 기준: {record.sourceType === 'calculated' ? 'Supabase 선수 스냅숏 자동 계산' : WEEKLY_RECORD_SOURCE}</p>
       </section>
     </div>
   );
@@ -1078,7 +1079,7 @@ function GameCenter({ games, liveGame, selectedLiveGame, favoriteTeam, detailOpe
   );
 }
 
-function MyPage({ favoriteTeam, onOpenSettings }) {
+function MyPage({ favoriteTeam, onOpenSettings, recordSourceLabel }) {
   const team = getTeam(favoriteTeam);
   return (
     <section className="my-page">
@@ -1091,15 +1092,16 @@ function MyPage({ favoriteTeam, onOpenSettings }) {
       <section className="my-setting-list">
         <button><span><Target size={18} /> 기록 알림</span><b>임박·달성</b><ChevronRight size={18} /></button>
         <button><span><Radio size={18} /> 실시간 갱신</span><b>10초</b><ChevronRight size={18} /></button>
-        <button><span><Info size={18} /> 데이터 기준</span><b>주간 예상 기록</b><ChevronRight size={18} /></button>
+        <button><span><Info size={18} /> 데이터 기준</span><b>{recordSourceLabel}</b><ChevronRight size={18} /></button>
       </section>
-      <p className="my-data-note">{WEEKLY_RECORD_SOURCE}<br />일정과 문자중계는 로컬 실시간 프록시 연결 상태에 따라 갱신됩니다.</p>
+      <p className="my-data-note">{recordSourceLabel}<br />일정과 문자중계는 실시간 프록시 연결 상태에 따라 갱신됩니다.</p>
     </section>
   );
 }
 
 function App() {
   const liveApiEnabled = hasLiveApi();
+  const supabaseEnabled = hasSupabaseRecords();
   const [date, setDate] = useState(INITIAL_DATE);
   const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favoriteTeamV2') || 'LG');
   const [liveGameId, setLiveGameId] = useState('');
@@ -1115,6 +1117,8 @@ function App() {
   const [mobileView, setMobileView] = useState('home');
   const [gameDetailOpen, setGameDetailOpen] = useState(false);
   const [liveError, setLiveError] = useState('');
+  const [calculatedRecords, setCalculatedRecords] = useState([]);
+  const [recordDataError, setRecordDataError] = useState('');
 
   const games = liveSchedule?.date === date ? liveSchedule.games : (GAMES[date] || []);
   const favoriteGame = games.find((game) => game.away === favoriteTeam || game.home === favoriteTeam);
@@ -1134,14 +1138,16 @@ function App() {
         ? '연결 중'
         : 'DEMO';
 
-  const activeRecords = useMemo(() => ACTIVE_RECORDS
+  const recordInputs = calculatedRecords.length > 0 ? calculatedRecords : ACTIVE_RECORDS;
+  const recordSourceLabel = calculatedRecords.length > 0 ? 'Supabase 자동 계산 기록' : WEEKLY_RECORD_SOURCE;
+  const activeRecords = useMemo(() => recordInputs
     .filter((record) => isRecordActiveOnDate(record, date))
     .map((record) => {
       const live = getRecordLiveDelta(record, liveStats);
       return { ...record, liveDelta: live.delta, liveStatLabel: live.label };
     })
     .sort((a, b) => getRecordState(a, a.liveDelta).remaining - getRecordState(b, b.liveDelta).remaining),
-  [date, liveStats]);
+  [date, liveStats, recordInputs]);
 
   const ourRecords = useMemo(() => activeRecords.filter((record) => isSameTeam(record.team, favoriteTeam)), [activeRecords, favoriteTeam]);
   const opponentRecords = useMemo(() => activeRecords.filter((record) => opponentTeam && isSameTeam(record.team, opponentTeam)), [activeRecords, opponentTeam]);
@@ -1169,6 +1175,28 @@ function App() {
     setTeamView('favorite');
     setGameDetailOpen(false);
   }, [date, favoriteTeam, liveSchedule?.rawDate]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) return undefined;
+    let cancelled = false;
+
+    fetchCalculatedRecords(date)
+      .then((records) => {
+        if (!cancelled) {
+          setCalculatedRecords(records);
+          setRecordDataError('');
+        }
+      })
+      .catch((error) => {
+        console.warn('Calculated records load failed', error);
+        if (!cancelled) {
+          setCalculatedRecords([]);
+          setRecordDataError('자동 계산 기록을 불러오지 못해 주간 자료를 표시합니다.');
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [date, supabaseEnabled]);
 
   useEffect(() => {
     if (!liveApiEnabled) return undefined;
@@ -1290,6 +1318,7 @@ function App() {
           <button className="icon-button" onClick={() => changeDate(1)} aria-label="다음 날짜" disabled={date === DAYS[DAYS.length - 1].key}><ArrowRight size={19} /></button>
         </section>
         {liveError && <p className="live-error" role="status">{liveError} 잠시 후 자동으로 다시 연결합니다.</p>}
+        {recordDataError && <p className="live-error" role="status">{recordDataError}</p>}
 
         <div className={mobileView === 'home' ? '' : 'view-hidden'}>
           <HomePage
@@ -1358,11 +1387,11 @@ function App() {
         </div>
 
         <div className={mobileView === 'my' ? '' : 'view-hidden'}>
-          <MyPage favoriteTeam={favoriteTeam} onOpenSettings={() => setSettingsOpen(true)} />
+          <MyPage favoriteTeam={favoriteTeam} onOpenSettings={() => setSettingsOpen(true)} recordSourceLabel={recordSourceLabel} />
         </div>
       </main>
 
-      <footer><span>개인용 기록 검색 데모</span><p>기록 기준: {WEEKLY_RECORD_SOURCE}. 일정과 문자중계는 로컬 프록시 연결 시 KBO 모바일 데이터를 불러옵니다.</p></footer>
+      <footer><span>개인용 기록 검색 데모</span><p>기록 기준: {recordSourceLabel}. 일정과 문자중계는 KBO 모바일 데이터를 불러옵니다.</p></footer>
 
       <nav className="mobile-nav">
         <button className={mobileView === 'home' ? 'active' : ''} onClick={() => changeView('home')}><Home size={21} /><span>HOME</span></button>
