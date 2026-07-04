@@ -44,7 +44,7 @@ npm run dev:web
 npm run live:proxy
 ```
 
-공개 GitHub Pages 배포본은 정적 호스팅이라 프록시를 실행할 수 없습니다. 실시간 기능은 로컬 개인용 실행 또는 별도 서버/서버리스 배포가 필요합니다.
+공개 GitHub Pages 배포본은 Vercel 서버리스 프록시를 통해 일정과 경기 데이터를 불러옵니다. 프록시 주소는 Pages 배포 워크플로의 `VITE_LIVE_API_URL`에 설정되어 있습니다.
 
 ## 실행
 
