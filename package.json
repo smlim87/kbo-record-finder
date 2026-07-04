@@ -4,8 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server/dev.mjs",
+    "dev:web": "vite",
+    "live:proxy": "node server/kbo-live-proxy.mjs",
     "build": "vite build",
+    "test": "node --test",
     "preview": "vite preview"
   },
   "dependencies": {
