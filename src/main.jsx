@@ -613,7 +613,7 @@ function LiveGamePanel({ game, liveGame, showTextcast = true }) {
 
 function RecordCard({ record, onOpen }) {
   const state = getRecordState(record, record.liveDelta || 0);
-  const game = GAMES[record.date].find((item) => item.id === record.game) || { away: record.team, home: record.team };
+  const game = (GAMES[record.date] || []).find((item) => item.id === record.game) || { away: record.team, home: record.team };
   const currentText = formatRecordValue(record, state, 'current');
   const remainingText = formatRecordValue(record, state, 'remaining');
   return (

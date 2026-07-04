@@ -28,13 +28,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify build environment
-        run: |
-          node -e "console.log(JSON.stringify({ hasSupabaseUrl: Boolean(process.env.VITE_SUPABASE_URL), supabaseKeyLength: (process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '').length }))"
-        env:
-          VITE_SUPABASE_URL: https://iribvqmnkpbgudzvfnqi.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-
       - name: Build
         run: npm run build
         env:
