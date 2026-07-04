@@ -50,19 +50,19 @@ const TEAM_NAME_TO_CODE = Object.entries(TEAMS).reduce((map, [code, team]) => {
   return map;
 }, {});
 
-const TEAM_LOGOS = {
-  LG: 'lg.svg',
-  HH: 'hh.svg',
-  LT: 'lt.svg',
-  KT: 'kt.svg',
-  SS: 'ss.svg',
-  NC: 'nc.svg',
-  DS: 'ds.svg',
-  OB: 'ds.svg',
-  WO: 'wo.svg',
-  SK: 'sk.svg',
-  KIA: 'kia.svg',
-  HT: 'kia.svg',
+const TEAM_BADGE_LABELS = {
+  LG: 'LG',
+  HH: 'HE',
+  LT: 'LT',
+  KT: 'KT',
+  SS: 'SL',
+  NC: 'NC',
+  DS: 'DB',
+  OB: 'DB',
+  WO: 'KH',
+  SK: 'SG',
+  KIA: 'KA',
+  HT: 'KA',
 };
 
 const SELECTABLE_TEAM_CODES = ['LG', 'HH', 'LT', 'KT', 'SS', 'NC', 'DS', 'WO', 'SK', 'KIA'];
@@ -343,10 +343,10 @@ function isSameTeam(left, right) {
 function TeamMark({ code, small = false }) {
   const team = getTeam(code);
   const teamCode = getTeamCode(code);
-  const logo = TEAM_LOGOS[teamCode] || TEAM_LOGOS[code] || TEAM_LOGOS.LG;
+  const label = TEAM_BADGE_LABELS[teamCode] || TEAM_BADGE_LABELS[code] || String(teamCode || '--').slice(0, 2);
   return (
-    <span className={`team-mark ${small ? 'small' : ''}`} style={{ '--team-color': team.color }}>
-      <img src={`${import.meta.env.BASE_URL}logos/${logo}`} alt={`${team.name} 로고`} />
+    <span className={`team-mark ${small ? 'small' : ''}`} style={{ '--team-color': team.color }} role="img" aria-label={`${team.name} 팀 배지`}>
+      <span aria-hidden="true">{label}</span>
     </span>
   );
 }

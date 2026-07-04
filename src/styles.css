@@ -67,9 +67,9 @@ main { min-height: calc(100vh - 150px); }
 .all-game.selected { background: #f4f1ec; color: #111316; }
 .all-game.selected .all-icon { color: #f4f1ec; background: #16181c; }
 
-.team-mark { --team-color: #333; flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: #fff; border: 2px solid color-mix(in srgb, var(--team-color), #fff 34%); box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 5px 14px rgba(0,0,0,.24); overflow: hidden; }
-.team-mark img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.team-mark.small { width: 29px; height: 29px; border-width: 1px; }
+.team-mark { --team-color: #555b66; flex: 0 0 auto; width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, color-mix(in srgb, var(--team-color), #fff 8%), color-mix(in srgb, var(--team-color), #090a0c 68%)); border: 1px solid color-mix(in srgb, var(--team-color), #fff 30%); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 5px 14px rgba(0,0,0,.24); font-size: 13px; font-weight: 900; letter-spacing: .04em; }
+.team-mark > span { transform: translateX(.02em); }
+.team-mark.small { width: 29px; height: 29px; border-radius: 8px; font-size: 9px; }
 .venue-mark { flex: 0 0 auto; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; color: #ffcf70; background: #3b3120; border: 1px solid #6f572d; }
 
 .records-section { max-width: 1180px; margin: 0 auto; padding: 34px 24px 70px; }
