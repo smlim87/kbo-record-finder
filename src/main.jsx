@@ -612,12 +612,12 @@ function LiveGamePanel({ game, liveGame, showTextcast = true }) {
 }
 
 function RecordCard({ record, onOpen }) {
-  const state = getRecordState(record, record.liveDelta || 0);
+  const state = getRecordState(record, 0);
   const game = (GAMES[record.date] || []).find((item) => item.id === record.game) || { away: record.team, home: record.team };
   const currentText = formatRecordValue(record, state, 'current');
   const remainingText = formatRecordValue(record, state, 'remaining');
   return (
-    <button className={`record-card ${record.liveDelta ? 'live-linked' : ''}`} onClick={() => onOpen(record)}>
+    <button className="record-card" onClick={() => onOpen(record)}>
       <span className="record-topline">
         <span className={`chance chance-${state.key}`}>{state.likelihood}</span>
         <span className="record-game">{getRecordGameLabel(record, game)}</span>
@@ -631,9 +631,8 @@ function RecordCard({ record, onOpen }) {
         <ChevronRight size={20} />
       </span>
       <span className="progress-track"><span style={{ width: `${state.progress}%` }} /></span>
-      {record.liveDelta > 0 && <span className="live-delta-badge">실시간 +{record.liveDelta}{record.liveStatLabel}</span>}
       <span className="progress-label">
-        <span>현재 <b>{currentText}{record.unit}</b>{record.liveDelta > 0 && <em> 경기 전 {record.currentText || formatRecordNumber(record.current)}</em>}</span>
+        <span>현재 <b>{currentText}{record.unit}</b></span>
         <strong>{remainingText}{record.unit} 남음</strong>
       </span>
     </button>
@@ -782,7 +781,7 @@ function RecordLiveStatus({ record, liveStats }) {
 
 function DetailSheet({ record, liveStats, onClose }) {
   if (!record) return null;
-  const state = getRecordState(record, record.liveDelta || 0);
+  const state = getRecordState(record, 0);
   const currentText = formatRecordValue(record, state, 'current');
   const remainingText = formatRecordValue(record, state, 'remaining');
   const maxRecent = Math.max(...record.recent, 1);
@@ -799,7 +798,6 @@ function DetailSheet({ record, liveStats, onClose }) {
           <span><Target size={18} /> 오늘의 도전 기록</span>
           <h3>{record.title}</h3>
           <p>현재 {currentText}{record.unit} <b>· {remainingText}{record.unit} 남음</b></p>
-          {record.liveDelta > 0 && <p className="live-detail-delta">이번 경기에서 +{record.liveDelta}{record.liveStatLabel} 감지</p>}
         </div>
         <div className="detail-section">
           <div className="section-title"><h3>{record.scope === '구장' ? '구장 현황' : '기록 현황'}</h3><span>{record.sourceType === 'calculated' ? '자동 계산' : '문서 기준'}</span></div>
@@ -816,7 +814,6 @@ function DetailSheet({ record, liveStats, onClose }) {
           </div>
           <p className="insight"><Sparkles size={16} /> {record.note}</p>
         </div>
-        <RecordLiveStatus record={record} liveStats={liveStats} />
         <p className="demo-notice"><Info size={15} /> 기록 기준: {record.sourceType === 'calculated' ? 'Supabase 선수 스냅숏 자동 계산' : WEEKLY_RECORD_SOURCE}</p>
       </section>
     </div>
