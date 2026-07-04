@@ -26,7 +26,7 @@ import {
 import { fetchKboLiveGame, fetchKboSchedule, hasLiveApi } from './liveApi';
 import { calculateLiveStats } from './recordEngine';
 import { WEEKLY_RECORDS, WEEKLY_RECORD_SOURCE } from './weeklyRecords';
-import { getTodayKey, getWeekDays } from './dateUtils';
+import { getTodayKey, getYearDays } from './dateUtils';
 import './styles.css';
 
 const TEAMS = {
@@ -66,8 +66,12 @@ const TEAM_BADGE_LABELS = {
 };
 
 const SELECTABLE_TEAM_CODES = ['LG', 'HH', 'LT', 'KT', 'SS', 'NC', 'DS', 'WO', 'SK', 'KIA'];
+const SEASON_YEAR = 2026;
+const SEASON_START = `${SEASON_YEAR}-01-01`;
+const SEASON_END = `${SEASON_YEAR}-12-31`;
 const TODAY = getTodayKey();
-const DAYS = getWeekDays(TODAY);
+const INITIAL_DATE = TODAY >= SEASON_START && TODAY <= SEASON_END ? TODAY : SEASON_START;
+const DAYS = getYearDays(SEASON_YEAR);
 
 const GAMES = {
   '2026-06-30': [
@@ -1096,7 +1100,7 @@ function MyPage({ favoriteTeam, onOpenSettings }) {
 
 function App() {
   const liveApiEnabled = hasLiveApi();
-  const [date, setDate] = useState(TODAY);
+  const [date, setDate] = useState(INITIAL_DATE);
   const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favoriteTeamV2') || 'LG');
   const [liveGameId, setLiveGameId] = useState('');
   const [liveSchedule, setLiveSchedule] = useState(null);
@@ -1265,7 +1269,24 @@ function App() {
       <main>
         <section className="date-bar">
           <button className="icon-button" onClick={() => changeDate(-1)} aria-label="이전 날짜" disabled={date === DAYS[0].key}><ArrowLeft size={19} /></button>
-          <div><CalendarDays size={18} /><b>{dateLabel} · {selectedDay?.day}요일</b><span className={`demo-badge ${liveError ? 'error' : ''}`}>{liveBadge}</span></div>
+          <div className="date-selector">
+            <CalendarDays size={18} />
+            <span className="date-selector-copy"><b>{dateLabel} · {selectedDay?.day}요일</b><small>2026 전체</small></span>
+            <input
+              className="date-picker-input"
+              type="date"
+              aria-label="2026년 경기 날짜 선택"
+              title="2026년 경기 날짜 선택"
+              min={SEASON_START}
+              max={SEASON_END}
+              value={date}
+              onChange={(event) => {
+                const nextDate = event.target.value;
+                if (nextDate >= SEASON_START && nextDate <= SEASON_END) setDate(nextDate);
+              }}
+            />
+            <span className={`demo-badge ${liveError ? 'error' : ''}`}>{liveBadge}</span>
+          </div>
           <button className="icon-button" onClick={() => changeDate(1)} aria-label="다음 날짜" disabled={date === DAYS[DAYS.length - 1].key}><ArrowRight size={19} /></button>
         </section>
         {liveError && <p className="live-error" role="status">{liveError} 잠시 후 자동으로 다시 연결합니다.</p>}

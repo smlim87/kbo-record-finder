@@ -37,3 +37,20 @@ export function getWeekDays(dateKey) {
     };
   });
 }
+
+export function getYearDays(year) {
+  const firstDay = `${year}-01-01`;
+  const lastDay = `${year}-12-31`;
+  const days = [];
+
+  for (let key = firstDay; key <= lastDay; key = addDays(key, 1)) {
+    const date = new Date(`${key}T00:00:00Z`);
+    days.push({
+      key,
+      day: DAY_NAMES[date.getUTCDay()],
+      label: `${Number(key.slice(5, 7))}.${Number(key.slice(8, 10))}`,
+    });
+  }
+
+  return days;
+}
