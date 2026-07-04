@@ -72,7 +72,7 @@ main { min-height: calc(100vh - 150px); }
 .all-game.selected .all-icon { color: #f4f1ec; background: #16181c; }
 
 .team-mark { --team-color: #555b66; flex: 0 0 auto; width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, color-mix(in srgb, var(--team-color), #fff 8%), color-mix(in srgb, var(--team-color), #090a0c 68%)); border: 1px solid color-mix(in srgb, var(--team-color), #fff 30%); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 5px 14px rgba(0,0,0,.24); font-size: 13px; font-weight: 900; letter-spacing: .04em; }
-.team-mark > span { transform: translateX(.02em); }
+.team-mark > span { display: block; line-height: 1; transform: translate(.02em, .05em); }
 .team-mark.small { width: 29px; height: 29px; border-radius: 8px; font-size: 9px; }
 .venue-mark { flex: 0 0 auto; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; color: #ffcf70; background: #3b3120; border: 1px solid #6f572d; }
 
@@ -351,7 +351,7 @@ main { min-height: calc(100vh - 150px); }
 .record-status-tabs button { min-width: 0; height: 31px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
 .record-status-tabs button.active { color: #fff; background: #444952; font-weight: 800; }
 .my-team-card { width: 100%; min-height: 86px; display: grid; grid-template-columns: 52px minmax(0, 1fr) 24px; align-items: center; gap: 13px; margin-top: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 14px; text-align: left; cursor: pointer; }
-.my-team-card > span { display: flex; flex-direction: column; }
+.my-team-card > span { align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
 .my-team-card small, .my-team-card em { color: var(--muted); font-size: 10px; font-style: normal; }
 .my-team-card b { margin: 2px 0; font-size: 18px; }
 .my-setting-list { margin-top: 18px; border-top: 1px solid var(--line); }

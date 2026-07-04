@@ -1091,7 +1091,6 @@ function MyPage({ favoriteTeam, onOpenSettings, recordSourceLabel }) {
       </button>
       <section className="my-setting-list">
         <button><span><Target size={18} /> 기록 알림</span><b>임박·달성</b><ChevronRight size={18} /></button>
-        <button><span><Radio size={18} /> 실시간 갱신</span><b>10초</b><ChevronRight size={18} /></button>
         <button><span><Info size={18} /> 데이터 기준</span><b>{recordSourceLabel}</b><ChevronRight size={18} /></button>
       </section>
       <p className="my-data-note">{recordSourceLabel}<br />일정과 문자중계는 실시간 프록시 연결 상태에 따라 갱신됩니다.</p>
@@ -1371,7 +1370,6 @@ function App() {
           ) : (
             <div className="empty-state"><SlidersHorizontal size={28} /><h3>조건에 맞는 기록이 없어요</h3><p>기록 범위나 상태 필터를 바꿔보세요.</p><button onClick={() => { setScope('전체'); setRole('전체'); setRecordStatus('전체'); setQuery(''); }}>필터 초기화</button></div>
           )}
-          <LiveStatsPanel stats={liveStats} game={liveGame} teamFilter={liveStatsTeamFilter} trackedRecord={detailRecord} />
         </section>
 
         <div className={mobileView === 'game' ? '' : 'view-hidden'}>
