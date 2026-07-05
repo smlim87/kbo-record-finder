@@ -5,17 +5,14 @@ import {
   ArrowLeft,
   ArrowRight,
   CalendarDays,
-  Check,
   ChevronRight,
   CircleUserRound,
   Clock3,
   Heart,
   Home,
-  Info,
   MapPin,
   Radio,
   Search,
-  Settings2,
   SlidersHorizontal,
   Sparkles,
   ShieldAlert,
@@ -51,21 +48,6 @@ const TEAM_NAME_TO_CODE = Object.entries(TEAMS).reduce((map, [code, team]) => {
   return map;
 }, {});
 
-const TEAM_BADGE_LABELS = {
-  LG: 'LG',
-  HH: 'HE',
-  LT: 'LT',
-  KT: 'KT',
-  SS: 'SL',
-  NC: 'NC',
-  DS: 'DB',
-  OB: 'DB',
-  WO: 'KH',
-  SK: 'SG',
-  KIA: 'KA',
-  HT: 'KA',
-};
-
 const SELECTABLE_TEAM_CODES = ['LG', 'HH', 'LT', 'KT', 'SS', 'NC', 'DS', 'WO', 'SK', 'KIA'];
 const SEASON_YEAR = 2026;
 const SEASON_START = `${SEASON_YEAR}-01-01`;
@@ -73,6 +55,40 @@ const SEASON_END = `${SEASON_YEAR}-12-31`;
 const TODAY = getTodayKey();
 const INITIAL_DATE = TODAY >= SEASON_START && TODAY <= SEASON_END ? TODAY : SEASON_START;
 const DAYS = getYearDays(SEASON_YEAR);
+const CALENDAR_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function getMonthKey(dateKey) {
+  return dateKey.slice(0, 7);
+}
+
+function addMonths(monthKey, amount) {
+  const date = new Date(`${monthKey}-01T00:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + amount);
+  return date.toISOString().slice(0, 7);
+}
+
+function getCalendarDays(monthKey) {
+  const firstDate = new Date(`${monthKey}-01T00:00:00Z`);
+  const startOffset = firstDate.getUTCDay();
+  const firstGridDate = new Date(firstDate);
+  firstGridDate.setUTCDate(firstDate.getUTCDate() - startOffset);
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(firstGridDate);
+    day.setUTCDate(firstGridDate.getUTCDate() + index);
+    const key = day.toISOString().slice(0, 10);
+    return {
+      key,
+      day: day.getUTCDate(),
+      inMonth: key.startsWith(monthKey),
+      disabled: key < SEASON_START || key > SEASON_END,
+    };
+  });
+}
+
+function formatMonthLabel(monthKey) {
+  return `${Number(monthKey.slice(0, 4))}년 ${Number(monthKey.slice(5, 7))}월`;
+}
 
 const GAMES = {
   '2026-06-30': [
@@ -270,7 +286,18 @@ function getRecordState(record, liveDelta = 0) {
   const recentAverage = record.recent.reduce((sum, value) => sum + value, 0) / record.recent.length;
   const likelihood = remaining === 0 ? '달성' : remaining <= Math.max(1, recentAverage) ? '매우 유력' : remaining <= Math.max(2, recentAverage * 2) ? '주목' : '도전';
   const key = likelihood === '매우 유력' ? 'hot' : likelihood === '주목' ? 'watch' : likelihood === '달성' ? 'done' : 'try';
-  return { current, remaining, likelihood, key, progress: Math.min((current / record.milestone) * 100, 100) };
+  const chanceBasis = remaining === 0
+    ? '기준 도달'
+    : `최근 평균 ${formatRecordNumber(recentAverage)}${record.unit} / ${formatRecordNumber(remaining)}${record.unit} 남음`;
+  return { current, remaining, recentAverage, likelihood, key, chanceBasis, progress: Math.min((current / record.milestone) * 100, 100) };
+}
+
+function getKboRankText(record) {
+  const rawRank = record.kboRank || record.rank || record.season?.비고 || '';
+  if (!rawRank || rawRank === '-') return '';
+  if (rawRank === '최다' || rawRank.includes('최다')) return 'KBO 기준 최다';
+  if (rawRank.includes('첫')) return 'KBO 기준 첫 번째';
+  return `KBO 기준 ${rawRank}`;
 }
 
 function formatRecordNumber(value) {
@@ -348,9 +375,10 @@ function isSameTeam(left, right) {
 function TeamMark({ code, small = false }) {
   const team = getTeam(code);
   const teamCode = getTeamCode(code);
-  const label = TEAM_BADGE_LABELS[teamCode] || TEAM_BADGE_LABELS[code] || String(teamCode || '--').slice(0, 2);
+  const label = team.name || String(teamCode || '--');
+  const isKoreanLabel = /[가-힣]/.test(label);
   return (
-    <span className={`team-mark ${small ? 'small' : ''}`} style={{ '--team-color': team.color }} role="img" aria-label={`${team.name} 팀 배지`}>
+    <span className={`team-mark ${small ? 'small' : ''} ${isKoreanLabel ? 'korean-label' : ''}`} style={{ '--team-color': team.color }} role="img" aria-label={`${team.name} 팀 배지`}>
       <span aria-hidden="true">{label}</span>
     </span>
   );
@@ -420,6 +448,36 @@ function RecordLineupCard({ game, selected, onSelect }) {
   );
 }
 
+function CalendarPopover({ month, selectedDate, onMonthChange, onSelectDate }) {
+  const days = getCalendarDays(month);
+
+  return (
+    <div className="calendar-popover" role="dialog" aria-label="경기 날짜 선택">
+      <div className="calendar-head">
+        <button type="button" className="icon-button" onClick={() => onMonthChange(addMonths(month, -1))} disabled={month <= getMonthKey(SEASON_START)} aria-label="이전 달"><ArrowLeft size={16} /></button>
+        <b>{formatMonthLabel(month)}</b>
+        <button type="button" className="icon-button" onClick={() => onMonthChange(addMonths(month, 1))} disabled={month >= getMonthKey(SEASON_END)} aria-label="다음 달"><ArrowRight size={16} /></button>
+      </div>
+      <div className="calendar-weekdays">
+        {CALENDAR_WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
+      </div>
+      <div className="calendar-grid">
+        {days.map((day) => (
+          <button
+            key={day.key}
+            type="button"
+            className={`${day.inMonth ? '' : 'muted'} ${day.key === selectedDate ? 'selected' : ''} ${day.key === TODAY ? 'today' : ''}`}
+            disabled={day.disabled}
+            onClick={() => onSelectDate(day.key)}
+          >
+            {day.day}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function buildLiveFeed(game, liveGame) {
   if (!liveGame?.state && !game?.kboId) return null;
 
@@ -437,22 +495,122 @@ function buildLiveFeed(game, liveGame) {
   const section = String(state.SECTION_ID);
   const status = section === '2' ? 'LIVE' : section === '3' ? '종료' : section === '4' ? '취소' : '경기 전';
   const bases = String(state.BASE_SC || '').split('');
+  const currentBases = ['1', '2', '3'].map((base) => bases.includes(base));
+  const currentBatter = liveGame?.ground?.listHitter?.[0]?.P_NM || latestEvent?.batter || game.current?.batter || game.pitchers?.away || '-';
+  const currentBallCount = liveGame?.ground?.listBallCnt?.[0];
 
   return {
     status,
     inning: section === '2' ? `${state.INN_NO}회${state.TB_NM}` : status,
     score: { away: Number(state.A_SCORE_CN || game.score?.away || 0), home: Number(state.H_SCORE_CN || game.score?.home || 0) },
-    bases: ['1', '2', '3'].map((base) => bases.includes(base)),
+    bases: currentBases,
     outs: Number(state.OUT_CN || 0),
     pitcher: liveGame?.ground?.listDefense?.find((player) => String(player.POS_SC) === '1')?.P_NM || game.current?.pitcher || game.pitchers?.home || '-',
-    batter: liveGame?.ground?.listHitter?.[0]?.P_NM || latestEvent?.batter || game.current?.batter || game.pitchers?.away || '-',
+    batter: currentBatter,
     headline: latestEvent?.text || (section === '1' ? `선발 예고: ${game.awayName || getTeam(game.away).name} ${game.pitchers?.away || '-'}, ${game.homeName || getTeam(game.home).name} ${game.pitchers?.home || '-'}` : '실시간 문자중계를 불러오는 중입니다.'),
     events,
+    currentTextcast: status === 'LIVE' ? {
+      inningNo: Number(state.INN_NO || 0),
+      batter: currentBatter,
+      bases: currentBases,
+      outs: Number(state.OUT_CN || 0),
+      count: currentBallCount ? `${Number(currentBallCount.BALL_CN || 0)}-${Number(currentBallCount.STRIKE_CN || 0)}` : '',
+    } : null,
     source: liveGame?.state ? 'KBO 모바일 실시간 JSON' : 'KBO 모바일 일정 JSON',
   };
 }
 
-function getPlateAppearanceRows(events) {
+function getInningNumber(inning) {
+  const match = String(inning || '').match(/^(\d+)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function getPitchNumber(text) {
+  const match = String(text || '').match(/^(\d+)구/);
+  return match ? `${match[1]}구` : '';
+}
+
+function getPitchResultText(text) {
+  return String(text || '')
+    .replace(/^\d+구\s*/, '')
+    .replace(/\d{2,3}(?:\.\d+)?\s?km\/h\s*[가-힣A-Za-z]*/i, '')
+    .trim();
+}
+
+function getPitchInfo(event) {
+  const fromFields = [event.pitchSpeed, event.pitchType].filter(Boolean).join(' ');
+  if (fromFields) return fromFields;
+
+  const textMatch = String(event.text || '').match(/(\d{2,3}(?:\.\d+)?\s?km\/h)\s*([가-힣A-Za-z]+)?/i);
+  if (!textMatch) return '';
+  return [textMatch[1].replace(/\s/g, ''), textMatch[2]].filter(Boolean).join(' ');
+}
+
+function inferBasesFromEvents(events) {
+  const baseSet = new Set();
+  for (const event of events) {
+    const text = event.text || '';
+    if (text.includes('만루')) ['1', '2', '3'].forEach((base) => baseSet.add(base));
+    for (const match of text.matchAll(/([123])루주자/g)) baseSet.add(match[1]);
+    for (const match of text.matchAll(/([123])루\s*(?:도루|진루|아웃|홈인|까지|에서)/g)) baseSet.add(match[1]);
+  }
+  return ['1', '2', '3'].map((base) => baseSet.has(base));
+}
+
+function hasAnyBase(bases) {
+  return bases.some(Boolean);
+}
+
+function getRowBaseState(row, baseEvent, currentTextcast) {
+  if (baseEvent?.bases?.length) {
+    return {
+      bases: ['1', '2', '3'].map((base) => baseEvent.bases.includes(base)),
+      label: `${row.inning} 당시`,
+    };
+  }
+
+  if (currentTextcast && row.inningNo === currentTextcast.inningNo && row.batter === currentTextcast.batter) {
+    return {
+      bases: currentTextcast.bases,
+      label: '현재 타석',
+    };
+  }
+
+  const inferredBases = inferBasesFromEvents(row.events);
+  return {
+    bases: inferredBases,
+    label: hasAnyBase(inferredBases) ? '문자 기준' : '주자 없음',
+  };
+}
+
+function buildPitchRows(events) {
+  let balls = 0;
+  let strikes = 0;
+
+  return events.map((event) => {
+    const pitchNumber = getPitchNumber(event.text);
+    const result = getPitchResultText(event.text);
+    let inferredCount = '';
+
+    if (pitchNumber) {
+      if (result.includes('볼')) balls = Math.min(balls + 1, 4);
+      if (result.includes('스트라이크') || result.includes('헛스윙')) strikes = Math.min(strikes + 1, 3);
+      if (result.includes('파울') && strikes < 2) strikes += 1;
+      inferredCount = `${balls}-${strikes}`;
+    }
+
+    return {
+      id: event.id,
+      pitchNumber,
+      result,
+      pitchInfo: getPitchInfo(event),
+      count: event.pitchCount || inferredCount,
+      text: event.text,
+    };
+  });
+}
+
+function getPlateAppearanceRows(events, currentTextcast = null) {
   const grouped = new Map();
 
   for (const event of events) {
@@ -473,12 +631,18 @@ function getPlateAppearanceRows(events) {
   return Array.from(grouped.values()).map((row) => {
     const resultEvent = [...row.events].reverse().find((event) => !/^(\d+)구/.test(event.text)) || row.events[row.events.length - 1];
     const pitches = row.events.filter((event) => /^(\d+)구/.test(event.text));
+    const baseEvent = [...row.events].reverse().find((event) => event.bases?.length);
     const result = resultEvent?.text || '';
+    const baseState = getRowBaseState(row, baseEvent, currentTextcast);
 
     return {
       ...row,
+      inningNo: getInningNumber(row.inning),
       pitchCount: pitches.length,
       result,
+      bases: baseState.bases,
+      baseLabel: baseState.label,
+      pitchRows: buildPitchRows(row.events),
       badge: getTextcastBadge(result),
       scoring: row.events.some((event) => event.text.includes('홈인')),
     };
@@ -493,7 +657,7 @@ function getTextcastBadge(text) {
   if (text.includes('안타') || text.includes('1루타')) return { label: '1루타', type: 'hit' };
   if (text.includes('볼넷')) return { label: '볼넷', type: 'walk' };
   if (text.includes('몸에 맞는 볼')) return { label: '사구', type: 'walk' };
-  if (text.includes('삼진')) return { label: 'KOUT', type: 'out' };
+  if (text.includes('삼진')) return { label: 'OUT', type: 'out' };
   if (text.includes('아웃')) return { label: 'OUT', type: 'out' };
   if (text.includes('홈인')) return { label: '득점', type: 'score' };
   return { label: '진행', type: 'neutral' };
@@ -521,10 +685,25 @@ function BaseDiamond({ bases }) {
 
 function TextcastBoard({ feed }) {
   const [filter, setFilter] = useState('all');
+  const [inningFilter, setInningFilter] = useState('1');
+  const allRows = useMemo(() => getPlateAppearanceRows(feed.events || [], feed.currentTextcast), [feed.events, feed.currentTextcast]);
+  const inningNumbers = useMemo(() => {
+    const maxInning = Math.min(11, Math.max(9, ...allRows.map((row) => row.inningNo).filter(Boolean)));
+    return Array.from({ length: maxInning }, (_, index) => index + 1);
+  }, [allRows]);
+
+  useEffect(() => {
+    const inningsWithRows = allRows.map((row) => row.inningNo).filter(Boolean);
+    if (!inningsWithRows.length) return;
+    const current = Number(inningFilter);
+    if (inningsWithRows.includes(current)) return;
+    setInningFilter(String(Math.min(11, Math.max(...inningsWithRows))));
+  }, [allRows, inningFilter]);
+
   const rows = useMemo(() => {
-    const groupedRows = getPlateAppearanceRows(feed.events || []);
-    return filter === 'score' ? groupedRows.filter((row) => row.scoring) : groupedRows;
-  }, [feed.events, filter]);
+    const inningRows = allRows.filter((row) => row.inningNo === Number(inningFilter));
+    return filter === 'score' ? inningRows.filter((row) => row.scoring) : inningRows;
+  }, [allRows, filter, inningFilter]);
 
   if (!feed.events?.length) {
     return (
@@ -536,12 +715,19 @@ function TextcastBoard({ feed }) {
 
   return (
     <div className="textcast-board">
+      <div className="inning-tabs" aria-label="중계 이닝 선택">
+        {inningNumbers.map((inning) => (
+          <button key={inning} className={inningFilter === String(inning) ? 'active' : ''} onClick={() => setInningFilter(String(inning))}>
+            {inning}회
+          </button>
+        ))}
+      </div>
       <div className="textcast-tabs" aria-label="문자중계 필터">
         <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>전체</button>
         <button className={filter === 'score' ? 'active' : ''} onClick={() => setFilter('score')}>득점</button>
       </div>
       <div className="textcast-rows">
-        {rows.map((row) => (
+        {rows.length > 0 ? rows.map((row) => (
           <details key={row.key} className="textcast-row">
             <summary>
               <span className={`result-badge result-${row.badge.type}`}>{row.badge.label}</span>
@@ -553,18 +739,26 @@ function TextcastBoard({ feed }) {
             </summary>
             <div className="textcast-detail">
               <div className="textcast-mini-field">
-                <BaseDiamond bases={feed.bases} />
-                <span>{feed.outs}OUT</span>
+                <BaseDiamond bases={row.bases} />
+                <span>{row.baseLabel}</span>
               </div>
               <div className="pitch-log">
                 <b>{row.battingOrder}번타자 {row.batter}</b>
-                {row.events.map((event, index) => (
-                  <p key={`${event.id}-${index}`}>{event.text}</p>
+                {row.pitchRows.map((event, index) => (
+                  event.pitchNumber ? (
+                    <p key={`${event.id}-${index}`} className="pitch-row">
+                      <span>{event.pitchNumber} {event.result}</span>
+                      <em>{event.pitchInfo || '구속 대기'}</em>
+                      <strong>{event.count || '-'}</strong>
+                    </p>
+                  ) : (
+                    <p key={`${event.id}-${index}`} className="pitch-outcome">{event.text}</p>
+                  )
                 ))}
               </div>
             </div>
           </details>
-        ))}
+        )) : <p className="textcast-empty inning-empty">{inningFilter}회 중계 기록이 없습니다.</p>}
       </div>
     </div>
   );
@@ -606,18 +800,18 @@ function LiveGamePanel({ game, liveGame, showTextcast = true }) {
       </div>
 
       {showTextcast && <TextcastBoard feed={feed} />}
-      {showTextcast && <p className="live-source-note">{feed.source ? `${feed.source}에서 가져온 개인용 실시간 피드입니다.` : '현재는 샘플 문자중계입니다. 실제 서비스에서는 허가된 경기 데이터 API 또는 자체 입력 피드로 교체해야 합니다.'}</p>}
     </section>
   );
 }
 
 function RecordCard({ record, onOpen }) {
-  const state = getRecordState(record, 0);
+  const state = getRecordState(record, record.liveDelta || 0);
   const game = (GAMES[record.date] || []).find((item) => item.id === record.game) || { away: record.team, home: record.team };
   const currentText = formatRecordValue(record, state, 'current');
   const remainingText = formatRecordValue(record, state, 'remaining');
+  const kboRankText = getKboRankText(record);
   return (
-    <button className="record-card" onClick={() => onOpen(record)}>
+    <button className={`record-card ${record.liveDelta > 0 ? 'live-linked' : ''}`} onClick={() => onOpen(record)}>
       <span className="record-topline">
         <span className={`chance chance-${state.key}`}>{state.likelihood}</span>
         <span className="record-game">{getRecordGameLabel(record, game)}</span>
@@ -627,12 +821,14 @@ function RecordCard({ record, onOpen }) {
         <span className="player-copy">
           <span className="player-name">{record.player || record.entity} <small>{getRecordTypeLabel(record)}</small></span>
           <strong>{record.title}</strong>
+          {kboRankText && <em className="kbo-rank">{kboRankText}</em>}
         </span>
         <ChevronRight size={20} />
       </span>
+      {record.liveDelta > 0 && <span className="live-delta-badge">실시간 +{formatRecordNumber(record.liveDelta)}{record.liveStatLabel || record.unit}</span>}
       <span className="progress-track"><span style={{ width: `${state.progress}%` }} /></span>
       <span className="progress-label">
-        <span>현재 <b>{currentText}{record.unit}</b></span>
+        <span>현재 <b>{currentText}{record.unit}</b><em>{state.chanceBasis}</em></span>
         <strong>{remainingText}{record.unit} 남음</strong>
       </span>
     </button>
@@ -781,9 +977,10 @@ function RecordLiveStatus({ record, liveStats }) {
 
 function DetailSheet({ record, liveStats, onClose }) {
   if (!record) return null;
-  const state = getRecordState(record, 0);
+  const state = getRecordState(record, record.liveDelta || 0);
   const currentText = formatRecordValue(record, state, 'current');
   const remainingText = formatRecordValue(record, state, 'remaining');
+  const kboRankText = getKboRankText(record);
   const maxRecent = Math.max(...record.recent, 1);
   return (
     <div className="sheet-backdrop" onMouseDown={onClose}>
@@ -798,6 +995,8 @@ function DetailSheet({ record, liveStats, onClose }) {
           <span><Target size={18} /> 오늘의 도전 기록</span>
           <h3>{record.title}</h3>
           <p>현재 {currentText}{record.unit} <b>· {remainingText}{record.unit} 남음</b></p>
+          {kboRankText && <p className="live-detail-delta">{kboRankText}</p>}
+          <p>{state.chanceBasis}</p>
         </div>
         <div className="detail-section">
           <div className="section-title"><h3>{record.scope === '구장' ? '구장 현황' : '기록 현황'}</h3><span>{record.sourceType === 'calculated' ? '자동 계산' : '문서 기준'}</span></div>
@@ -814,32 +1013,6 @@ function DetailSheet({ record, liveStats, onClose }) {
           </div>
           <p className="insight"><Sparkles size={16} /> {record.note}</p>
         </div>
-        <p className="demo-notice"><Info size={15} /> 기록 기준: {record.sourceType === 'calculated' ? 'Supabase 선수 스냅숏 자동 계산' : WEEKLY_RECORD_SOURCE}</p>
-      </section>
-    </div>
-  );
-}
-
-function TeamSettings({ current, onSave, onClose }) {
-  const [selected, setSelected] = useState(current);
-  return (
-    <div className="sheet-backdrop" onMouseDown={onClose}>
-      <section className="team-sheet" onMouseDown={(event) => event.stopPropagation()} aria-modal="true" role="dialog">
-        <div className="sheet-handle" />
-        <button className="icon-button close-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
-        <h2>선호팀 설정</h2>
-        <p>선택한 팀의 경기와 기록을 먼저 보여드려요.</p>
-        <div className="team-grid">
-          {SELECTABLE_TEAM_CODES.map((code) => {
-            const team = getTeam(code);
-            return (
-            <button key={code} className={selected === code ? 'active' : ''} onClick={() => setSelected(code)}>
-              <TeamMark code={code} /><span>{team.name}</span>{selected === code && <Check size={16} />}
-            </button>
-            );
-          })}
-        </div>
-        <button className="primary-button" onClick={() => onSave(selected)}>선택 완료</button>
       </section>
     </div>
   );
@@ -854,7 +1027,7 @@ function FavoriteGameHero({ game, liveGame, favoriteTeam, recordCount, warningCo
   if (!game) {
     return (
       <section className="favorite-game-hero no-game">
-        <span className="eyebrow">MY GAME</span>
+        <span className="eyebrow">TEAM GAME</span>
         <h1>{getTeam(favoriteTeam).name} 경기가 없어요</h1>
         <p>다음 경기와 이번 주 예상 기록은 기록 탭에서 확인할 수 있어요.</p>
         <button className="home-secondary-button" onClick={() => onOpenRecords('favorite')}>이번 주 기록 보기</button>
@@ -870,7 +1043,7 @@ function FavoriteGameHero({ game, liveGame, favoriteTeam, recordCount, warningCo
   return (
     <section className="favorite-game-hero">
       <div className="hero-kicker">
-        <span><Heart size={13} fill="currentColor" /> MY GAME</span>
+        <span><Heart size={13} fill="currentColor" /> TEAM GAME</span>
         <b className={feed.status === 'LIVE' ? 'is-live' : ''}>{feed.inning}</b>
       </div>
       <button className="hero-score" onClick={onOpenGame}>
@@ -881,8 +1054,38 @@ function FavoriteGameHero({ game, liveGame, favoriteTeam, recordCount, warningCo
       <p className="hero-meta">{game.time} · {game.venue} · {game.weather}</p>
       <div className="hero-record-actions">
         <button onClick={() => onOpenRecords('favorite')}><Target size={16} /><span>우리 팀 도전</span><b>{recordCount}</b><ChevronRight size={16} /></button>
-        <button onClick={() => onOpenRecords('opponent')}><ShieldAlert size={16} /><span>상대 달성 주의</span><b>{warningCount}</b><ChevronRight size={16} /></button>
+        <button onClick={() => onOpenRecords('opponent')}><ShieldAlert size={16} /><span>상대 팀 도전</span><b>{warningCount}</b><ChevronRight size={16} /></button>
       </div>
+    </section>
+  );
+}
+
+function HomeTeamSelector({ selectedTeam, games, onSelectTeam }) {
+  const [open, setOpen] = useState(false);
+  const playingTeams = new Set(games.flatMap((game) => [game.away, game.home]));
+  const selected = getTeam(selectedTeam);
+
+  return (
+    <section className={`home-team-selector ${open ? 'open' : 'collapsed'}`} aria-label="홈 화면 기준 구단 선택">
+      <button className="team-selector-toggle" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+        <span><span className="eyebrow">TEAM VIEW</span><b>기준 구단 선택</b></span>
+        <em><TeamMark code={selectedTeam} small />{selected.name}</em>
+        <ChevronRight className="toggle-chevron" size={17} />
+      </button>
+      {open && (
+        <div className="home-team-grid">
+          {SELECTABLE_TEAM_CODES.map((code) => {
+            const team = getTeam(code);
+            const hasGame = playingTeams.has(code);
+            return (
+              <button key={code} className={selectedTeam === code ? 'active' : ''} onClick={() => { onSelectTeam(code); setOpen(false); }}>
+                <TeamMark code={code} small />
+                <span><b>{team.name}</b><small>{hasGame ? '오늘 경기' : '경기 없음'}</small></span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -914,9 +1117,11 @@ function RadarRecordRow({ record, onOpen }) {
   );
 }
 
-function HomePage({ games, favoriteGame, favoriteTeam, liveGames, ourRecords, opponentRecords, onOpenGame, onOpenRecords, onOpenRecord }) {
+function HomePage({ games, favoriteGame, favoriteTeam, liveGames, ourRecords, opponentRecords, onOpenGame, onOpenRecords, onOpenRecord, onSelectTeam }) {
   return (
     <section className="home-page">
+      <HomeTeamSelector selectedTeam={favoriteTeam} games={games} onSelectTeam={onSelectTeam} />
+
       <FavoriteGameHero
         game={favoriteGame}
         liveGame={liveGames[favoriteGame?.id]}
@@ -935,7 +1140,7 @@ function HomePage({ games, favoriteGame, favoriteTeam, liveGames, ourRecords, op
           {ourRecords.length === 0 && <p className="radar-empty">오늘 확인할 우리 팀 기록이 없어요.</p>}
         </div>
         <div className="radar-group warning">
-          <div className="radar-heading"><span><ShieldAlert size={16} /> 상대 달성 주의</span><b>{opponentRecords.length}</b></div>
+          <div className="radar-heading"><span><ShieldAlert size={16} /> 상대 팀 도전</span><b>{opponentRecords.length}</b></div>
           {opponentRecords.slice(0, 2).map((record) => <RadarRecordRow key={record.id} record={record} onOpen={onOpenRecord} />)}
           {opponentRecords.length === 0 && <p className="radar-empty">상대 팀의 임박 기록이 없어요.</p>}
         </div>
@@ -1059,7 +1264,6 @@ function GameCenter({ games, liveGame, selectedLiveGame, favoriteTeam, detailOpe
         {summaryTab === 'relay' && (
           <section className="summary-tab-panel relay-panel">
             <TextcastBoard feed={feed} />
-            <p className="live-source-note">{feed.source ? `${feed.source}에서 가져온 개인용 실시간 피드입니다.` : '현재는 샘플 문자중계입니다.'}</p>
           </section>
         )}
       </section>
@@ -1076,30 +1280,13 @@ function GameCenter({ games, liveGame, selectedLiveGame, favoriteTeam, detailOpe
   );
 }
 
-function MyPage({ favoriteTeam, onOpenSettings, recordSourceLabel }) {
-  const team = getTeam(favoriteTeam);
-  return (
-    <section className="my-page">
-      <div className="page-heading"><span className="eyebrow">MY BASEBALL</span><h1>내 야구</h1><p>응원팀을 기준으로 경기와 기록을 정리합니다.</p></div>
-      <button className="my-team-card" onClick={onOpenSettings}>
-        <TeamMark code={favoriteTeam} />
-        <span><small>선호팀</small><b>{team.name}</b><em>{team.city}</em></span>
-        <Settings2 size={20} />
-      </button>
-      <section className="my-setting-list">
-        <button><span><Target size={18} /> 기록 알림</span><b>임박·달성</b><ChevronRight size={18} /></button>
-        <button><span><Info size={18} /> 데이터 기준</span><b>{recordSourceLabel}</b><ChevronRight size={18} /></button>
-      </section>
-      <p className="my-data-note">{recordSourceLabel}<br />일정과 문자중계는 실시간 프록시 연결 상태에 따라 갱신됩니다.</p>
-    </section>
-  );
-}
-
 function App() {
   const liveApiEnabled = hasLiveApi();
   const supabaseEnabled = hasSupabaseRecords();
   const [date, setDate] = useState(INITIAL_DATE);
-  const [favoriteTeam, setFavoriteTeam] = useState(() => localStorage.getItem('favoriteTeamV2') || 'LG');
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(getMonthKey(INITIAL_DATE));
+  const [favoriteTeam, setFavoriteTeam] = useState('LG');
   const [liveGameId, setLiveGameId] = useState('');
   const [liveSchedule, setLiveSchedule] = useState(null);
   const [liveGames, setLiveGames] = useState({});
@@ -1109,7 +1296,6 @@ function App() {
   const [recordStatus, setRecordStatus] = useState('전체');
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileView, setMobileView] = useState('home');
   const [gameDetailOpen, setGameDetailOpen] = useState(false);
   const [liveError, setLiveError] = useState('');
@@ -1123,7 +1309,7 @@ function App() {
   const selectedLiveGame = liveGames[liveGame?.id];
   const liveStats = useMemo(() => calculateLiveStats(selectedLiveGame?.textcast || []), [selectedLiveGame?.textcast]);
   const liveStatsTeamFilter = teamView === 'opponent' ? opponentTeam : favoriteTeam;
-  const recordsHeading = teamView === 'opponent' ? '상대 달성 주의' : '우리 팀 도전';
+  const recordsHeading = teamView === 'opponent' ? '상대 팀 도전' : '우리 팀 도전';
   const dateLabel = date === TODAY ? '오늘' : `${Number(date.slice(5, 7))}월 ${Number(date.slice(8))}일`;
   const selectedDay = DAYS.find((day) => day.key === date);
   const liveBadge = liveSchedule?.date === date
@@ -1146,7 +1332,10 @@ function App() {
   [date, liveStats, recordInputs]);
 
   const ourRecords = useMemo(() => activeRecords.filter((record) => isSameTeam(record.team, favoriteTeam)), [activeRecords, favoriteTeam]);
-  const opponentRecords = useMemo(() => activeRecords.filter((record) => opponentTeam && isSameTeam(record.team, opponentTeam)), [activeRecords, opponentTeam]);
+  const opponentRecords = useMemo(() => activeRecords.filter((record) => {
+    const state = getRecordState(record, record.liveDelta || 0);
+    return opponentTeam && isSameTeam(record.team, opponentTeam) && state.remaining > 0;
+  }), [activeRecords, opponentTeam]);
 
   const records = useMemo(() => activeRecords
     .filter((record) => scope === '전체' || (record.scope || '선수') === scope)
@@ -1156,10 +1345,11 @@ function App() {
     })
     .filter((record) => scope === '팀' || role === '전체' || record.role === role)
     .filter((record) => {
-      if (recordStatus === '전체') return true;
       const state = getRecordState(record, record.liveDelta || 0);
+      if (teamView === 'opponent' && recordStatus !== '달성' && state.remaining === 0) return false;
+      if (recordStatus === '전체') return true;
       if (recordStatus === '달성') return state.remaining === 0;
-      if (recordStatus === '추적 중') return record.liveDelta > 0 && state.remaining > 0;
+      if (recordStatus === '도전') return state.key === 'try' && state.remaining > 0;
       return ['hot', 'watch'].includes(state.key) && state.remaining > 0;
     })
     .filter((record) => !query || `${record.player || ''} ${record.entity || ''} ${record.title} ${getTeam(record.team).name}`.includes(query.trim())),
@@ -1247,13 +1437,22 @@ function App() {
 
   const changeDate = (direction) => {
     const index = DAYS.findIndex((day) => day.key === date);
-    setDate(DAYS[Math.min(Math.max(index + direction, 0), DAYS.length - 1)].key);
+    const nextDate = DAYS[Math.min(Math.max(index + direction, 0), DAYS.length - 1)].key;
+    setDate(nextDate);
+    setCalendarMonth(getMonthKey(nextDate));
   };
 
-  const saveTeam = (team) => {
+  const selectDate = (nextDate) => {
+    setDate(nextDate);
+    setCalendarMonth(getMonthKey(nextDate));
+    setCalendarOpen(false);
+  };
+
+  const selectTeam = (team) => {
     setFavoriteTeam(team);
-    localStorage.setItem('favoriteTeamV2', team);
-    setSettingsOpen(false);
+    setMobileView('home');
+    setDetail(null);
+    scrollTop();
   };
 
   const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1283,33 +1482,49 @@ function App() {
     scrollTop();
   };
 
+  const canGoBack = Boolean(detail) || gameDetailOpen || mobileView !== 'home';
+  const goBack = () => {
+    if (detail) {
+      setDetail(null);
+      return;
+    }
+    if (gameDetailOpen) {
+      setGameDetailOpen(false);
+      scrollTop();
+      return;
+    }
+    if (mobileView !== 'home') {
+      changeView('home');
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-ball" /><span><b>기록앞에</b><small>오늘 만날 야구 기록</small></span></div>
-        <button className="favorite-button" onClick={() => setSettingsOpen(true)}><TeamMark code={favoriteTeam} small /><span>{getTeam(favoriteTeam).name}</span><Settings2 size={16} /></button>
+        <div className="brand">
+          {canGoBack && <button className="icon-button back-button" onClick={goBack} aria-label="뒤로가기"><ArrowLeft size={18} /></button>}
+          <span className="brand-ball" /><span><b>기록앞에</b><small>오늘 만날 야구 기록</small></span>
+        </div>
+        <button className="favorite-button" onClick={() => changeView('home')}><TeamMark code={favoriteTeam} small /><span>{getTeam(favoriteTeam).name}</span><Home size={16} /></button>
       </header>
 
       <main>
         <section className="date-bar">
           <button className="icon-button" onClick={() => changeDate(-1)} aria-label="이전 날짜" disabled={date === DAYS[0].key}><ArrowLeft size={19} /></button>
-          <div className="date-selector">
-            <CalendarDays size={18} />
-            <span className="date-selector-copy"><b>{dateLabel} · {selectedDay?.day}요일</b><small>2026 전체</small></span>
-            <input
-              className="date-picker-input"
-              type="date"
-              aria-label="2026년 경기 날짜 선택"
-              title="2026년 경기 날짜 선택"
-              min={SEASON_START}
-              max={SEASON_END}
-              value={date}
-              onChange={(event) => {
-                const nextDate = event.target.value;
-                if (nextDate >= SEASON_START && nextDate <= SEASON_END) setDate(nextDate);
-              }}
-            />
+          <div className="date-selector-wrap">
+            <button className="date-selector" type="button" onClick={() => setCalendarOpen((open) => !open)} aria-expanded={calendarOpen}>
+              <CalendarDays size={18} />
+              <span className="date-selector-copy"><b>{dateLabel} · {selectedDay?.day}요일</b><small>2026 전체</small></span>
+            </button>
             <span className={`demo-badge ${liveError ? 'error' : ''}`}>{liveBadge}</span>
+            {calendarOpen && (
+              <CalendarPopover
+                month={calendarMonth}
+                selectedDate={date}
+                onMonthChange={setCalendarMonth}
+                onSelectDate={selectDate}
+              />
+            )}
           </div>
           <button className="icon-button" onClick={() => changeDate(1)} aria-label="다음 날짜" disabled={date === DAYS[DAYS.length - 1].key}><ArrowRight size={19} /></button>
         </section>
@@ -1327,6 +1542,7 @@ function App() {
             onOpenGame={openGame}
             onOpenRecords={openRecords}
             onOpenRecord={setDetail}
+            onSelectTeam={selectTeam}
           />
         </div>
 
@@ -1339,7 +1555,7 @@ function App() {
           <div className="team-view-tabs perspective-tabs" aria-label="기록 관점">
             {[
               { id: 'favorite', label: '우리 팀 도전', icon: Target },
-              { id: 'opponent', label: '상대 달성 주의', icon: ShieldAlert },
+              { id: 'opponent', label: '상대 팀 도전', icon: ShieldAlert },
             ].map(({ id, label, icon: Icon }) => (
               <button key={id} className={teamView === id ? 'active' : ''} onClick={() => setTeamView(id)}><Icon size={16} />{label}</button>
             ))}
@@ -1360,7 +1576,7 @@ function App() {
             </div>}
           </div>
           <div className="record-status-tabs" aria-label="기록 상태">
-            {['전체', '임박', '추적 중', '달성'].map((item) => <button key={item} className={recordStatus === item ? 'active' : ''} onClick={() => setRecordStatus(item)}>{item}</button>)}
+            {['전체', '임박', '도전', '달성'].map((item) => <button key={item} className={recordStatus === item ? 'active' : ''} onClick={() => setRecordStatus(item)}>{item}</button>)}
           </div>
           {records.length > 0 ? (
             <div className="record-list">{records.map((record) => <RecordCard key={record.id} record={record} onOpen={setDetail} />)}</div>
@@ -1381,22 +1597,15 @@ function App() {
           />
         </div>
 
-        <div className={mobileView === 'my' ? '' : 'view-hidden'}>
-          <MyPage favoriteTeam={favoriteTeam} onOpenSettings={() => setSettingsOpen(true)} recordSourceLabel={recordSourceLabel} />
-        </div>
       </main>
-
-      <footer><span>개인용 기록 검색 데모</span><p>기록 기준: {recordSourceLabel}. 일정과 문자중계는 KBO 모바일 데이터를 불러옵니다.</p></footer>
 
       <nav className="mobile-nav">
         <button className={mobileView === 'home' ? 'active' : ''} onClick={() => changeView('home')}><Home size={21} /><span>HOME</span></button>
         <button className={mobileView === 'records' ? 'active' : ''} onClick={() => changeView('records')}><Target size={21} /><span>기록</span></button>
         <button className={mobileView === 'game' ? 'active' : ''} onClick={() => changeView('game')}><CalendarDays size={21} /><span>경기</span></button>
-        <button className={mobileView === 'my' ? 'active' : ''} onClick={() => changeView('my')}><CircleUserRound size={21} /><span>MY</span></button>
       </nav>
 
       <DetailSheet record={detailRecord} liveStats={liveStats} onClose={() => setDetail(null)} />
-      {settingsOpen && <TeamSettings current={favoriteTeam} onSave={saveTeam} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

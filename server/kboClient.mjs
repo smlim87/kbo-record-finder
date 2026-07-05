@@ -66,6 +66,43 @@ function normalizeGame(game, weatherList) {
   };
 }
 
+function normalizePitchSpeed(event) {
+  const speed = event.BALL_SPEED
+    || event.PITCH_SPEED
+    || event.SPEED
+    || event.SPEED_VA
+    || event.BALL_VA
+    || event.PIT_SPEED
+    || event.PITCH_SPEED_VA
+    || '';
+  const normalized = String(speed).replace(/[^\d.]/g, '');
+  return normalized ? `${normalized}km/h` : '';
+}
+
+function normalizePitchType(event) {
+  return (event.PIT_KIND_NM
+    || event.PITCH_KIND_NM
+    || event.BALL_KIND_NM
+    || event.KIND_NM
+    || event.PITCH_NM
+    || event.BALL_NM
+    || '').trim();
+}
+
+function normalizePitchCount(event) {
+  const balls = event.BALL_CN ?? event.B_CN ?? event.BALL_COUNT ?? event.BALL_CNT;
+  const strikes = event.STRIKE_CN ?? event.S_CN ?? event.STRIKE_COUNT ?? event.STRIKE_CNT;
+  const ballNumber = Number(balls);
+  const strikeNumber = Number(strikes);
+  return Number.isFinite(ballNumber) && Number.isFinite(strikeNumber) ? `${ballNumber}-${strikeNumber}` : '';
+}
+
+function normalizeBases(event) {
+  return String(event.BASE_SC || event.RUNNER_SC || event.BASE_CN || '')
+    .split('')
+    .filter((base) => ['1', '2', '3'].includes(base));
+}
+
 function normalizeLiveText(data) {
   return (data.listInnTb || []).flatMap((inning) => (
     (inning.listBatOrder || []).flatMap((plateAppearance) => {
@@ -79,6 +116,10 @@ function normalizeLiveText(data) {
         batter: plateAppearance.BAT_P_NM,
         battingOrder: plateAppearance.BAT_ORDER_NO,
         text: event.LIVETEXT_IF,
+        pitchSpeed: normalizePitchSpeed(event),
+        pitchType: normalizePitchType(event),
+        pitchCount: normalizePitchCount(event),
+        bases: normalizeBases(event),
         style: event.TEXTSTYLE_SC,
       }));
     })
